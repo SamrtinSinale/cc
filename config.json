@@ -1,0 +1,407 @@
+{
+  "log": {
+    "disabled": false,
+    "level": "warn",
+    "timestamp": true,
+    "output": "files/logs/box.log"
+  },
+  "dns": {
+    "servers": [
+      {
+        "tag": "hosts",
+        "type": "hosts",
+        "predefined": {
+          "dns.google": ["8.8.8.8", "8.8.4.4"],
+          "dns.alidns.com": ["223.5.5.5","223.6.6.6"]
+        }
+      },
+      {
+        "tag": "GoogleDNS",
+        "type": "https",
+        "server": "dns.google",
+        "server_port": 443,
+        "path": "/dns-query",
+        "domain_resolver": "hosts",
+        "detour": "代理选择"
+      },
+      {
+        "tag": "AliyunDNS",
+        "type": "https",
+        "server": "dns.alidns.com",
+        "server_port": 443,
+        "path": "/dns-query",
+        "domain_resolver": "hosts",
+        "detour": "CN-direct"
+      },
+      {
+        "tag": "fakeip",
+        "type": "fakeip",
+        "inet4_range": "198.18.0.0/15"
+      },
+      {
+        "tag": "local",
+        "type": "local"
+      }
+    ],
+    "rules": [
+      {
+        "query_type": "AAAA",
+        "action": "predefined",
+        "rcode": "NXDOMAIN"
+      },
+      {
+        "query_type": "PTR",
+        "action": "predefined",
+        "rcode": "NXDOMAIN"
+      },
+      {
+        "query_type": ["HTTPS", "SVCB"],
+        "action": "predefined",
+        "rcode": "NOERROR"
+      },
+      {
+        "clash_mode": "Direct",
+        "action": "route",
+        "server": "AliyunDNS"
+      },
+      {
+        "clash_mode": "Global",
+        "action": "route",
+        "server": "GoogleDNS"
+      },
+      {
+        "rule_set": "webrtc",
+        "action": "predefined",
+        "rcode": "NXDOMAIN"
+      },
+      {
+        "type": "logical",
+        "mode": "and",
+        "rules": [
+          {
+            "clash_mode": "Rule+Ads"
+          },
+          {
+            "rule_set": "ads"
+          }
+        ],
+        "action": "predefined",
+        "rcode": "NXDOMAIN"
+      },
+      {
+        "domain": [
+          "mtalk.google.com",
+          "mobile-gtalk.l.google.com"
+        ],
+        "action": "route",
+        "server": "AliyunDNS"
+      },
+      {
+        "rule_set": "cn_domain",
+        "action": "route",
+        "server": "AliyunDNS"
+      },
+      {
+        "rule_set": "private_domain",
+        "action": "route",
+        "server": "AliyunDNS"
+      },
+      {
+        "rule_set": ["proxy_domain", "AI"],
+        "query_type": ["A", "AAAA"],
+        "action": "route",
+        "server": "fakeip"
+      },
+      {
+        "action": "evaluate",
+        "server": "GoogleDNS"
+      },
+      {
+        "match_response": true,
+        "rule_set": "cn_ip",
+        "action": "route",
+        "server": "AliyunDNS"
+      },
+      {
+        "match_response": true,
+        "action": "respond"
+      }
+    ],
+    "final": "GoogleDNS",
+    "optimistic": {
+      "enabled": true,
+      "timeout": "3d"
+    },
+    "strategy": "ipv4_only",
+    "reverse_mapping": true
+  },
+  "inbounds": [
+    {
+      "type": "mixed",
+      "tag": "mixed-in",
+      "listen": "127.0.0.1",
+      "listen_port": 7890
+    },
+    {
+      "type": "tun",
+      "tag": "tun-in",
+      "address": [
+      "172.19.0.1/30"
+    ],
+      "mtu": 9000,
+      "auto_route": true,
+      "strict_route": true,
+      "stack": "system"
+    }   
+ ],
+  "outbounds": [
+    {
+      "tag": "代理选择",
+      "type": "selector",
+      "outbounds": ["HK-Socks", "机场订阅", "CF自建"],
+      "default": "HK-Socks"
+    },
+    {
+      "tag": "AI分流",
+      "type": "selector",
+      "outbounds": [
+        "CF自建",
+        "机场订阅"
+      ],
+      "default": "CF自建"
+    },
+    {
+      "tag": "CF自建",
+      "type": "selector",
+      "providers": [
+        "CFProvider"
+      ],
+      "outbounds": []
+    },
+    {
+      "tag": "机场订阅",
+      "type": "selector",
+      "providers": [
+        "SUB"
+      ],
+      "outbounds": []
+    },
+    {
+      "tag": "国内网站",
+      "type": "selector",
+      "outbounds": ["CN-direct", "代理选择"]
+    },
+    {
+      "tag": "CN-direct",
+      "type": "direct",
+      "fallback_delay": "300ms"
+    },
+    {
+      "tag": "HK-Socks",
+      "type": "socks",
+      "server": "61.141.236.11",
+      "server_port": 12004,
+      "version": "5",
+      "username": "qq719177532",
+      "password": "myangelbu4ni@",
+      "network": "tcp"
+    }
+  ],
+  "providers": [
+    {
+      "tag": "SUB",
+      "type": "remote",
+      "url": "https://dash.xn--cp3a08l.com/api/v1/pq/197efbdb1f19ccb3e978267049c6a6da",
+      "update_interval": "24h0m0s",
+      "http_client": {
+        "detour": "CN-direct"
+      }
+    },
+    {
+      "tag": "CFProvider",
+      "type": "remote",
+      "url": "https://clash2sfa.xmdhs.com/sub?sub=https%3A%2F%2Fdeg2.pages.dev%2Fsub%3Ftoken%3Dd045c456e26681f6a7b276cce8daa438%26clash",
+      "update_interval": "24h0m0s",
+      "http_client": {
+        "detour": "CN-direct"
+      }
+    }
+  ],
+  "route": {
+    "default_domain_resolver": {
+      "server": "AliyunDNS"
+    },
+    "rules": [
+      {
+        "action": "sniff",
+        "sniffer": ["http", "tls", "quic", "dns", "bittorrent"],
+        "timeout": "500ms"
+      },
+      {
+        "type": "logical",
+        "mode": "or",
+        "rules": [
+          { "port": 53 },
+          { "protocol": "dns" }
+        ],
+        "action": "hijack-dns"
+      },
+      {
+        "protocol": "bittorrent",
+        "action": "route",
+        "outbound": "CN-direct"
+      },
+      {
+        "clash_mode": "Direct",
+        "action": "route",
+        "outbound": "CN-direct"
+      },
+      {
+        "clash_mode": "Global",
+        "action": "route",
+        "outbound": "代理选择"
+      },
+      {
+        "rule_set": "webrtc",
+        "action": "reject",
+        "method": "drop"
+      },
+      {
+        "ip_is_private": true,
+        "action": "route",
+        "outbound": "CN-direct"
+      },
+      {
+        "rule_set": "private_domain",
+        "action": "route",
+        "outbound": "CN-direct"
+      },
+      {
+        "domain": [
+          "mtalk.google.com",
+          "mobile-gtalk.l.google.com"
+        ],
+        "action": "route",
+        "outbound": "CN-direct"
+      },
+      {
+        "network": "udp",
+        "port": 443,
+        "ip_cidr": ["198.18.0.0/15"],
+        "action": "reject"
+      },
+      {
+        "ip_cidr": ["198.18.0.0/15"],
+        "action": "route",
+        "outbound": "代理选择"
+      },
+      {
+        "clash_mode": "Rule+Ads",
+        "rule_set": "ads",
+        "action": "reject",
+        "method": "drop"
+      },
+      {
+        "rule_set": "AI",
+        "action": "route",
+        "outbound": "AI分流"
+      },
+      {
+        "domain_suffix": [".youtube.com", ".googlevideo.com", ".ytimg.com"],
+        "action": "route",
+        "outbound": "代理选择"
+      },
+      {
+        "domain_suffix": [".googleapis.com", ".google.com"],
+        "outbound": "AI分流",
+        "action": "route"
+      },
+      {
+        "rule_set": ["cn_ip", "cn_domain"],
+        "action": "route",
+        "outbound": "国内网站"
+      },
+      {
+        "rule_set": "proxy_domain",
+        "action": "route",
+        "outbound": "代理选择"
+      }
+    ],
+    "rule_set": [
+      {
+        "tag": "cn_ip",
+        "type": "remote",
+        "format": "binary",
+        "url": "https://ghfast.top/github.com/DustinWin/ruleset_geodata/releases/download/sing-box-ruleset/cnip.srs",
+        "http_client": { "detour": "CN-direct" }
+      },
+      {
+        "tag": "cn_domain",
+        "type": "remote",
+        "format": "binary",
+        "url": "https://ghfast.top/github.com/DustinWin/ruleset_geodata/releases/download/sing-box-ruleset/cn.srs",
+        "http_client": { "detour": "CN-direct" }
+      },
+      {
+        "tag": "AI",
+        "type": "remote",
+        "format": "binary",
+        "url": "https://ghfast.top/github.com/DustinWin/ruleset_geodata/releases/download/sing-box-ruleset/ai.srs",
+        "http_client": { "detour": "CN-direct" }
+      },
+      {
+        "tag": "proxy_domain",
+        "type": "remote",
+        "format": "binary",
+        "url": "https://ghfast.top/github.com/DustinWin/ruleset_geodata/releases/download/sing-box-ruleset/proxy.srs",
+        "http_client": { "detour": "CN-direct" }
+      },
+      {
+        "tag": "ads",
+        "type": "remote",
+        "format": "binary",
+        "url": "https://ghfast.top/github.com/DustinWin/ruleset_geodata/releases/download/sing-box-ruleset/ads.srs",
+        "http_client": { "detour": "CN-direct" }
+      },
+      {
+        "tag": "webrtc",
+        "type": "remote",
+        "format": "binary",
+        "url": "https://ghfast.top/raw.githubusercontent.com/ljrgov/conf/refs/heads/main/sing-box/rules/Webrtc.srs",
+        "http_client": { "detour": "CN-direct" }
+      },
+      {
+        "tag": "private_domain",
+        "type": "remote",
+        "format": "binary",
+        "url": "https://ghfast.top/raw.githubusercontent.com/MetaCubeX/meta-rules-dat/sing/geo/geosite/private.srs",
+        "http_client": { "detour": "CN-direct" }
+      }
+    ],
+    "final": "代理选择",
+    "auto_detect_interface": true
+  },
+  "http_clients": [
+    {
+      "tag": "proxy_download",
+      "version": 2,
+      "detour": "代理选择"
+    }
+  ],
+  "experimental": {
+    "urltest_unified_delay": true,
+    "clash_api": {
+      "default_mode": "Rule+Ads",
+      "external_controller": "127.0.0.1:9090",
+      "external_ui": "zashboard",
+      "external_ui_download_url": "https://github.com/Zephyruso/zashboard/releases/latest/download/dist.zip",
+      "external_ui_http_client": "proxy_download"
+    },
+    "cache_file": {
+      "enabled": true,
+      "path": "files/runtime/cache.db",
+      "store_fakeip": true,
+      "store_dns": true
+    }
+  }
+}
